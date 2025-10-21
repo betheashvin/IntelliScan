@@ -16,73 +16,89 @@ def load_model():
     if not os.path.exists(model_path):
         st.info("📥 Downloading model from Google Drive...")
         try:
-            import gdown
+            import requests
+            import re
             
-            # Method 1: Try different URL formats
             file_id = "1HGduInluShD47GUvVYUeDXKqHyjhP0wv"
+            session = requests.Session()
             
-            # Try multiple URL formats
-            urls_to_try = [
-                f"https://drive.google.com/uc?id={file_id}",
-                f"https://drive.google.com/uc?export=download&id={file_id}",
-                f"https://docs.google.com/uc?export=download&id={file_id}"
-            ]
+            # First, get the virus scan warning page
+            URL = "https://drive.google.com/uc"
+            response = session.get(URL, params={'id': file_id, 'export': 'download'}, stream=True)
             
-            success = False
-            for i, url in enumerate(urls_to_try):
-                st.write(f"🔄 Trying URL {i+1}: {url}")
-                try:
-                    gdown.download(url, model_path, quiet=False)
+            # Extract the confirmation token from the HTML
+            content = response.text
+            token = None
+            
+            # Look for the confirmation token in the HTML
+            match = re.search(r"confirm=([0-9A-Za-z_]+)", content)
+            if match:
+                token = match.group(1)
+            else:
+                # Alternative pattern
+                match = re.search(r'<input type="hidden" name="confirm" value="([0-9A-Za-z_]+)"', content)
+                if match:
+                    token = match.group(1)
+            
+            if token:
+                st.write(f"🔐 Found confirmation token: {token}")
+                
+                # Download with confirmation token
+                params = {'id': file_id, 'confirm': token, 'export': 'download'}
+                response = session.get(URL, params=params, stream=True)
+                
+                # Download the actual file
+                total_size = int(response.headers.get('content-length', 0))
+                st.write(f"📦 Actual file size: {total_size} bytes")
+                
+                if total_size > 10000000:  # If it's a reasonable size
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
                     
-                    if os.path.exists(model_path):
-                        file_size = os.path.getsize(model_path)
-                        st.write(f"📦 File size: {file_size} bytes")
-                        
-                        # Check if file is HTML (error page)
-                        with open(model_path, 'rb') as f:
-                            content = f.read(1000)
-                            if b'html' in content.lower() or b'error' in content.lower() or file_size < 5000:
-                                st.warning(f"❌ URL {i+1} returned HTML/error page ({file_size} bytes)")
-                                os.remove(model_path)
-                                continue
-                            else:
-                                st.success(f"✅ URL {i+1} worked! File size: {file_size} bytes")
-                                success = True
-                                break
-                except Exception as e:
-                    st.warning(f"❌ URL {i+1} failed: {e}")
-                    if os.path.exists(model_path):
+                    with open(model_path, 'wb') as f:
+                        downloaded = 0
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                if total_size > 0:
+                                    progress = downloaded / total_size
+                                    progress_bar.progress(min(progress, 1.0))
+                                    status_text.text(f"Downloaded: {downloaded}/{total_size} bytes ({progress:.1%})")
+                    
+                    progress_bar.empty()
+                    status_text.empty()
+                    
+                    # Verify final file size
+                    final_size = os.path.getsize(model_path)
+                    st.write(f"✅ Final file size: {final_size} bytes")
+                    
+                    if final_size > 10000000:
+                        st.success("🎉 Model downloaded successfully!")
+                    else:
+                        st.error(f"❌ File still too small: {final_size} bytes")
                         os.remove(model_path)
-                    continue
-            
-            if not success:
-                st.error("🚫 All download methods failed. The file might not be publicly accessible.")
+                        return None
+                else:
+                    st.error(f"❌ File size too small: {total_size} bytes")
+                    return None
+            else:
+                st.error("❌ Could not extract confirmation token from Google Drive")
+                st.info("💡 Try downloading the file manually and uploading it:")
                 
-                # Show what we're getting
-                st.info("🔍 Checking what's being returned...")
-                import requests
-                test_url = f"https://drive.google.com/uc?id={file_id}"
-                response = requests.get(test_url, stream=True)
-                st.write(f"Response status: {response.status_code}")
-                st.write(f"Response headers: {dict(response.headers)}")
-                
-                # Show first 500 characters of response
-                content_preview = response.text[:500] if response.text else "No content"
-                st.write(f"Content preview: {content_preview}")
-                
-                return None
-
-            # Final verification
-            file_size = os.path.getsize(model_path)
-            if file_size < 10000000:  # Less than 10MB
-                st.error(f"❌ File too small ({file_size} bytes) - likely corrupted")
-                os.remove(model_path)
+                # Fallback: Manual upload
+                uploaded_model = st.file_uploader("Upload model file manually", type=['pkl'], key="model_upload")
+                if uploaded_model is not None:
+                    with open(model_path, "wb") as f:
+                        f.write(uploaded_model.getbuffer())
+                    st.success("✅ Model uploaded manually!")
+                    st.rerun()
                 return None
                 
-            st.success("✅ Model downloaded successfully!")
-            
         except Exception as e:
-            st.error(f"❌ Failed to download model: {e}")
+            st.error(f"❌ Download failed: {e}")
+            import traceback
+            st.write("Detailed error:", traceback.format_exc())
             return None
     
     # Load model
@@ -224,4 +240,5 @@ else:
 # Footer
 st.markdown("---")
 st.markdown("**Model Accuracy:** 99.4% | **Supported Types:** Invoices, Receipts, Contracts, Research Papers | **Features:** Single & Batch Processing")
+
 
