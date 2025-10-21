@@ -1,28 +1,40 @@
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastai.vision.all import *
-from huggingface_hub import hf_hub_download
 import pandas as pd
 import io
 import os
+import requests
 from PIL import Image
 
-app = FastAPI(title="IntellisScan API", version="1.0")
+app = FastAPI(title="IntelliScan API", version="1.0")
 
 # Download model if not exists
 def load_model():
-    if not os.path.exists("intelliscan_model_final.pkl"):
-        print("📥 Downloadimg model from Hugging Face Hub...")
-        model_path = hf_hub_download(
-            repo_id="ashvinkumar/intelliscan-model",
-            filename="intelliscan_model_final.pkl",
-            local_dir="."
-        )
-        return model_path
-    return "intelliscan_model_final.pkl"
+
+    model_path = "intelliscan_model_final.pkl"
+
+    if not os.path.exists(model_path):
+        print("📥 Downloadimg model from Google Drive...")
+
+        file_id = "1HGduInluShD47GUvVYUeDXKqHyjhP0wv"
+        download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        try:
+            reponse = requests.get(download_url)
+            with open(model_path, "wb") as f:
+                f.write(reponse.content)
+            print(" ✅ Model downloaded successfully.")
+        except Exception as e:
+            print(f"❌ Failed to download model: {e}")
+            return None
+        
+    return model_path
 
 model_path = load_model()
-model = load_learner(model_path)
+if model_path:
+    model = load_learner(model_path)
+else:
+    raise Exception("Model could not be loaded.")
 
 @app.post("/predict-single")
 async def predict_single(file: UploadFile = File(...)):
