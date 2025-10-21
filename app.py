@@ -50,7 +50,7 @@ with tab1:
 with tab2:
     # Batch processing
     st.subheader("Process Multiple Files")
-    uploaded_files = st.file_uploader("Choose multiple files", type=["jpg", "jpeg", "png"], accept_multiple_files=True, hey="batch")
+    uploaded_files = st.file_uploader("Choose multiple files", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="batch")
 
     if uploaded_files:
         st.write(f"📁 Selected {len(uploaded_files)} files")
@@ -108,3 +108,4 @@ with tab2:
 #Footer
 st.markdown("---")
 st.markdown("**Model Accuracy:** 95%+ | **Supported Types:** Invoices, Receipts, Contracts, Research Papers | **Features:** Single & Batch Processing")
+
