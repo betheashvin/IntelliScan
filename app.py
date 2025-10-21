@@ -13,32 +13,74 @@ st.set_page_config(page_title="IntelliScan", layout="centered")
 def load_model():
     model_path = "intelliscan_model_final.pkl"
     
-    # Download model if not exists - FIXED DOWNLOAD
     if not os.path.exists(model_path):
         st.info("📥 Downloading model from Google Drive...")
         try:
+            import gdown
+            
+            # Method 1: Try different URL formats
             file_id = "1HGduInluShD47GUvVYUeDXKqHyjhP0wv"
             
-            # ✅ FIXED: Use session and confirm parameter
-            session = requests.Session()
-            download_url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+            # Try multiple URL formats
+            urls_to_try = [
+                f"https://drive.google.com/uc?id={file_id}",
+                f"https://drive.google.com/uc?export=download&id={file_id}",
+                f"https://docs.google.com/uc?export=download&id={file_id}"
+            ]
             
-            response = session.get(download_url, stream=True)
+            success = False
+            for i, url in enumerate(urls_to_try):
+                st.write(f"🔄 Trying URL {i+1}: {url}")
+                try:
+                    gdown.download(url, model_path, quiet=False)
+                    
+                    if os.path.exists(model_path):
+                        file_size = os.path.getsize(model_path)
+                        st.write(f"📦 File size: {file_size} bytes")
+                        
+                        # Check if file is HTML (error page)
+                        with open(model_path, 'rb') as f:
+                            content = f.read(1000)
+                            if b'html' in content.lower() or b'error' in content.lower() or file_size < 5000:
+                                st.warning(f"❌ URL {i+1} returned HTML/error page ({file_size} bytes)")
+                                os.remove(model_path)
+                                continue
+                            else:
+                                st.success(f"✅ URL {i+1} worked! File size: {file_size} bytes")
+                                success = True
+                                break
+                except Exception as e:
+                    st.warning(f"❌ URL {i+1} failed: {e}")
+                    if os.path.exists(model_path):
+                        os.remove(model_path)
+                    continue
             
-            # ✅ Save in chunks to avoid corruption
-            with open(model_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-            
-            # ✅ Verify file size
+            if not success:
+                st.error("🚫 All download methods failed. The file might not be publicly accessible.")
+                
+                # Show what we're getting
+                st.info("🔍 Checking what's being returned...")
+                import requests
+                test_url = f"https://drive.google.com/uc?id={file_id}"
+                response = requests.get(test_url, stream=True)
+                st.write(f"Response status: {response.status_code}")
+                st.write(f"Response headers: {dict(response.headers)}")
+                
+                # Show first 500 characters of response
+                content_preview = response.text[:500] if response.text else "No content"
+                st.write(f"Content preview: {content_preview}")
+                
+                return None
+
+            # Final verification
             file_size = os.path.getsize(model_path)
-            if file_size < 10000000:  # Less than 10MB = probably corrupted
-                st.error(f"❌ Downloaded file seems corrupted (only {file_size} bytes)")
+            if file_size < 10000000:  # Less than 10MB
+                st.error(f"❌ File too small ({file_size} bytes) - likely corrupted")
                 os.remove(model_path)
                 return None
                 
             st.success("✅ Model downloaded successfully!")
+            
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
             return None
@@ -50,10 +92,10 @@ def load_model():
         return model
     except Exception as e:
         st.error(f"❌ Model loading failed: {e}")
-        # ✅ Delete corrupted file
         if os.path.exists(model_path):
             os.remove(model_path)
         return None
+
 
 # Load model
 model = load_model()
@@ -182,3 +224,4 @@ else:
 # Footer
 st.markdown("---")
 st.markdown("**Model Accuracy:** 99.4% | **Supported Types:** Invoices, Receipts, Contracts, Research Papers | **Features:** Single & Batch Processing")
+
