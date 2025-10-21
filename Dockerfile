@@ -1,26 +1,19 @@
-FROM python:3.11-slim
+FROM python:3.9-slim
 
-# Install system build deps needed to build blis, thinc, spacy, etc.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      build-essential \
-      gcc \
-      g++ \
-      libffi-dev \
-      libssl-dev \
-      ca-certificates \
-      curl \
-      python3-dev && \
-    rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY . .
 
-# Upgrade packaging tools so pip can pick wheels when available
-RUN pip install --upgrade pip setuptools wheel
+# Install ALL build tools
+RUN apt-get update && apt-get install -y \
+    git \
+    gcc \
+    g++ \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python deps
-COPY requirements.txt .
+# Install packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . /app
-WORKDIR /app
-
-CMD ["bash", "-c", "uvicorn app:app --host 0.0.0.0 --port $PORT"]
+# Start services
+CMD uvicorn main:app --host 0.0.0.0 --port 8000 & streamlit run app.py --server.port 8501 --server.address 0.0.0.0
