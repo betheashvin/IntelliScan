@@ -4,85 +4,101 @@ from PIL import Image
 import pandas as pd
 import os
 import requests
-import io
+
+# ✅ SET PAGE CONFIG FIRST - ONLY ONCE
+st.set_page_config(page_title="IntelliScan", layout="centered")
 
 # Load model directly in Streamlit
 @st.cache_resource
 def load_model():
     model_path = "intelliscan_model_final.pkl"
     
-    # Download model if not exists
+    # Download model if not exists - FIXED DOWNLOAD
     if not os.path.exists(model_path):
         st.info("📥 Downloading model from Google Drive...")
         try:
             file_id = "1HGduInluShD47GUvVYUeDXKqHyjhP0wv"
-            download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
             
-            response = requests.get(download_url)
+            # ✅ FIXED: Use session and confirm parameter
+            session = requests.Session()
+            download_url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+            
+            response = session.get(download_url, stream=True)
+            
+            # ✅ Save in chunks to avoid corruption
             with open(model_path, "wb") as f:
-                f.write(response.content)
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            
+            # ✅ Verify file size
+            file_size = os.path.getsize(model_path)
+            if file_size < 10000000:  # Less than 10MB = probably corrupted
+                st.error(f"❌ Downloaded file seems corrupted (only {file_size} bytes)")
+                os.remove(model_path)
+                return None
+                
             st.success("✅ Model downloaded successfully!")
         except Exception as e:
             st.error(f"❌ Failed to download model: {e}")
             return None
     
-    # Load the model
+    # Load model
     try:
         model = load_learner(model_path)
+        st.success("✅ Model loaded successfully!")
         return model
     except Exception as e:
         st.error(f"❌ Model loading failed: {e}")
+        # ✅ Delete corrupted file
+        if os.path.exists(model_path):
+            os.remove(model_path)
         return None
 
 # Load model
 model = load_model()
 
-st.set_page_config(page_title="IntelliScan", layout="centered")
+# ✅ NOW the rest of your UI
 st.title("📄 IntelliScan - AI Document Classifier")
-st.write("Upload documents to classify as Invoice, Receipt, Contract, or Research Paper")
 
-# Single file prediction function
-def predict_single_image(image):
-    try:
-        # Save temp file
-        temp_path = "temp_prediction.jpg"
-        image.save(temp_path)
-        
-        # Predict
-        prediction, _, probs = model.predict(temp_path)
-        confidence = probs.max().item()
-        
-        # Get all probabilities
-        class_probs = {model.dls.vocab[i]: float(probs[i]) for i in range(len(model.dls.vocab))}
-        
-        # Clean up
-        os.remove(temp_path)
-        
-        return {
-            "document_type": str(prediction),
-            "confidence": confidence,
-            "all_probabilities": class_probs,
-            "status": "success"
-        }
-    except Exception as e:
-        return {"error": str(e), "status": "error"}
+if model is None:
+    st.error("🚫 Model not available. Please check the logs above.")
+    st.info("The model file might be corrupted or download failed.")
+else:
+    st.write("Upload documents to classify as Invoice, Receipt, Contract, or Research Paper")
+    
+    # Single file prediction function
+    def predict_single_image(image):
+        try:
+            temp_path = "temp_prediction.jpg"
+            image.save(temp_path)
+            prediction, _, probs = model.predict(temp_path)
+            confidence = probs.max().item()
+            class_probs = {model.dls.vocab[i]: float(probs[i]) for i in range(len(model.dls.vocab))}
+            os.remove(temp_path)
+            
+            return {
+                "document_type": str(prediction),
+                "confidence": confidence,
+                "all_probabilities": class_probs,
+                "status": "success"
+            }
+        except Exception as e:
+            return {"error": str(e), "status": "error"}
 
-# Create tabs
-tab1, tab2 = st.tabs(["🔍 Single File", "📚 Batch Processing"])
+    # Create tabs
+    tab1, tab2 = st.tabs(["🔍 Single File", "📚 Batch Processing"])
 
-with tab1:
-    # Single File Processing
-    uploaded_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"], key="single")
+    with tab1:
+        # Single File Processing
+        uploaded_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"], key="single")
 
-    if uploaded_file is not None:
-        # Display preview
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Document", use_column_width=True)
+        if uploaded_file is not None:
+            # Display preview
+            image = Image.open(uploaded_file)
+            st.image(image, caption="Uploaded Document", use_column_width=True)
 
-        if st.button('Classify Document', type="primary", key="single_btn"):
-            if model is None:
-                st.error("❌ Model not loaded. Please check model file.")
-            else:
+            if st.button('Classify Document', type="primary", key="single_btn"):
                 with st.spinner('Analyzing with AI...'):
                     result = predict_single_image(image)
                     
@@ -101,19 +117,16 @@ with tab1:
                     else:
                         st.error(f"❌ Classification failed: {result['error']}")
 
-with tab2:
-    # Batch processing
-    st.subheader("Process Multiple Files")
-    uploaded_files = st.file_uploader("Choose multiple files", type=["jpg", "jpeg", "png"], 
-                                     accept_multiple_files=True, key="batch")
+    with tab2:
+        # Batch processing
+        st.subheader("Process Multiple Files")
+        uploaded_files = st.file_uploader("Choose multiple files", type=["jpg", "jpeg", "png"], 
+                                         accept_multiple_files=True, key="batch")
 
-    if uploaded_files:
-        st.write(f"📁 Selected {len(uploaded_files)} files")
+        if uploaded_files:
+            st.write(f"📁 Selected {len(uploaded_files)} files")
 
-        if st.button("🔍 Classify All Documents", type="primary", key="batch_btn"):
-            if model is None:
-                st.error("❌ Model not loaded. Please check model file.")
-            else:
+            if st.button("🔍 Classify All Documents", type="primary", key="batch_btn"):
                 results = []
                 progress_bar = st.progress(0)
                 status_text = st.empty()
