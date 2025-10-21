@@ -1,7 +1,0 @@
-# .dockerignore
-__pycache__/
-*.pyc
-.git
-.DS_Store
-.env
-*.pkl
