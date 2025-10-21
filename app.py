@@ -6,8 +6,8 @@ import pandas as pd
 import base64
 
 st.set_page_config(page_title="IntelliScan", layout="centered")
-st.title("IntelliScan - AI Dcoumnet Classifier")
-st.write("Upload documnets to classify as Invoice, Receipt, Contract, or Research Paper ")
+st.title("IntelliScan - AI Document Classifier")
+st.write("Upload documents to classify as Invoice, Receipt, Contract, or Research Paper ")
 
 tab1, tab2 = st.tabs(["🔍 Single File", "📚 Batch Processing"])
 
@@ -107,4 +107,4 @@ with tab2:
 
 #Footer
 st.markdown("---")
-st.markdown("**Model Accuracy:** 99.4% | **Supported Types:** Invoices, Receipts, Contracts, Research Papers | **Features:** Single & Batch Processing")
+st.markdown("**Model Accuracy:** 95%+ | **Supported Types:** Invoices, Receipts, Contracts, Research Papers | **Features:** Single & Batch Processing")
