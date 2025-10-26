@@ -1,12 +1,13 @@
 import streamlit as st
+st.set_page_config(page_title="IntelliScan", layout="centered")
+
+import warnings
+warnings.filterwarnings("ignore")
 from fastai.vision.all import *
 from PIL import Image
 import pandas as pd
 import os
 import requests
-
-# SET PAGE CONFIG FIRST 
-st.set_page_config(page_title="IntelliScan", layout="centered")
 
 # Load model directly in Streamlit
 @st.cache_resource
@@ -14,7 +15,7 @@ def load_model():
     model_path = "intelliscan_model_final.pkl"
     
     if not os.path.exists(model_path):
-        st.info("📥 Downloading model from Dropbox...")
+        # st.info("📥 Downloading model from Dropbox...")
         try:
             import requests
             
@@ -90,7 +91,7 @@ Try uploading:
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 Model Info")
 st.sidebar.markdown("""
-- **Accuracy:** 95%+
+- **Accuracy:** 90%+
 - **Classes:** 4 document types
 - **Framework:** FastAI + PyTorch
 - **Support:** JPG, JPEG, PNG
@@ -216,11 +217,3 @@ else:
                         file_name="intelliscan_results.csv",
                         mime="text/csv"
                     )
-
-# Footer
-# st.markdown("---")
-# st.markdown("**Model Accuracy:** 95%+ | **Supported Types:** Invoices, Receipts, Contracts, Research Papers | **Features:** Single & Batch Processing")
-
-
-
-
