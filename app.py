@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import requests
 
-# ✅ SET PAGE CONFIG FIRST - ONLY ONCE
+# SET PAGE CONFIG FIRST 
 st.set_page_config(page_title="IntelliScan", layout="centered")
 
 # Load model directly in Streamlit
@@ -30,9 +30,9 @@ def load_model():
                             f.write(chunk)
                 
                 file_size = os.path.getsize(model_path)
-                st.success(f"✅ Model downloaded! ({file_size//1000000}MB)")
+                # st.success(f"✅ Model downloaded! ({file_size//1000000}MB)")
             else:
-                st.error("❌ Dropbox download failed")
+                st.error("❌ Model download failed")
                 return None
                 
         except Exception as e:
@@ -41,7 +41,7 @@ def load_model():
     
     try:
         model = load_learner(model_path)
-        st.success("✅ Model loaded successfully!")
+        # st.success("✅ Model loaded successfully!")
         return model
     except Exception as e:
         st.error(f"❌ Model loading failed: {e}")
@@ -54,6 +54,48 @@ model = load_model()
 # ✅ NOW the rest of your UI
 st.title("📄 IntelliScan - AI Document Classifier")
 
+st.sidebar.markdown("---")
+st.sidebar.info("""
+**Note for reviewers:**
+This is a free-tier deployment that sleeps after inactivity.
+
+**If the app is loading slowly:**
+- Wait 30-60 seconds for wake-up
+- Refresh the page  
+- First load might take 2-3 minutes
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔍 For Employers")
+st.sidebar.markdown("""
+**Technical Highlights:**
+- FastAI transfer learning
+- Model deployment pipeline  
+- Docker containerization
+- Cloud deployment (Render)
+- Production error handling
+- Batch processing capabilities
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎯 Quick Test")
+st.sidebar.markdown("""
+Try uploading:
+- Invoice images
+- Receipt photos  
+- Contract scans
+- Research papers
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 Model Info")
+st.sidebar.markdown("""
+- **Accuracy:** 95%+
+- **Classes:** 4 document types
+- **Framework:** FastAI + PyTorch
+- **Support:** JPG, JPEG, PNG
+""")
+
 if model is None:
     st.error("🚫 Model not available. Please check the logs above.")
     st.info("The model file might be corrupted or download failed.")
@@ -63,8 +105,11 @@ else:
     # Single file prediction function
     def predict_single_image(image):
         try:
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
             temp_path = "temp_prediction.jpg"
-            image.save(temp_path)
+            image.save(temp_path, "JPEG")
             prediction, _, probs = model.predict(temp_path)
             confidence = probs.max().item()
             class_probs = {model.dls.vocab[i]: float(probs[i]) for i in range(len(model.dls.vocab))}
@@ -173,8 +218,9 @@ else:
                     )
 
 # Footer
-st.markdown("---")
-st.markdown("**Model Accuracy:** 99.4% | **Supported Types:** Invoices, Receipts, Contracts, Research Papers | **Features:** Single & Batch Processing")
+# st.markdown("---")
+# st.markdown("**Model Accuracy:** 95%+ | **Supported Types:** Invoices, Receipts, Contracts, Research Papers | **Features:** Single & Batch Processing")
+
 
 
 
